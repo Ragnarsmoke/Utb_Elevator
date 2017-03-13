@@ -1,7 +1,8 @@
 package elevator;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
@@ -10,14 +11,31 @@ public class Elevator {
 
     private String name;
     private volatile int floor;
+    private int maxWeight = 600; // Default value
+    private int maxPeople = 8; // Default value
+
     private LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue<>();
-    private ArrayList<Person> passengers = new ArrayList<>();
+    private HashSet<Person> passengers = new HashSet<>();
 
     /**
      * Ejects the passengers that have their stop at the current floor
      */
     private boolean ejectPassengers() {
-        return false;
+        Iterator<Person> it = passengers.iterator();
+        Person p;
+        boolean exited = false;
+
+        while (it.hasNext()) {
+            p = it.next();
+
+            if (p.getTargetFloor() == getFloor()) {
+                it.remove();
+                System.out.printf("Person %s exited at floor %d%n", p.getName(), getFloor());
+                exited = true;
+            }
+        }
+
+        return exited;
     }
 
     /**
@@ -54,21 +72,67 @@ public class Elevator {
     }
 
     /**
-     * Queues a single floor
+     * Attempts to requests a single floor
      *
      * @param floor Floor
+     * @return True if the floor was successfully queued, false if the the floor
+     *         was not queued or the floor was already queued
      */
-    public void queue(int floor) {
-        queue.add(floor);
+    public boolean request(int floor) {
+        // Ensuring uniqueness
+        if (!queue.contains(floor)) {
+            return queue.add(floor);
+        } else {
+            return false;
+        }
     }
 
     /**
-     * Queues multiple floors
+     * Requests multiple floors
      *
      * @param floors Floors
+     * @return True if any floors were added
      */
-    public void queue(Collection<? extends Integer> floors) {
-        queue.addAll(floors);
+    public boolean request(Collection<? extends Integer> floors) {
+        Iterator<? extends Integer> it = floors.iterator();
+        boolean success = false;
+        int floor;
+
+        while (it.hasNext()) {
+            floor = it.next();
+
+            if (request(floor)) {
+                success = true;
+            }
+        }
+
+        return success;
+    }
+
+    /**
+     * Attempts to add a passenger to the elevator
+     * 
+     * @param passenger Passenger
+     */
+    public boolean addPassenger(Person passenger) {
+        // Checks if the elevator can support this person
+        if ((getTotalWeight() + passenger.getWeight() <= getMaxWeight())
+                && (passengers.size() + 1 <= getMaxPeople())) {
+            boolean isSuccess = passengers.add(passenger);
+
+            if (isSuccess) {
+                System.out.printf("Person %s entered at floor %d, target floor: %d%n",
+                        passenger.getName(),
+                        getFloor(),
+                        passenger.getTargetFloor());
+                System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n", passengers.size(),
+                        getTotalWeight());
+            }
+
+            return isSuccess;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -77,8 +141,15 @@ public class Elevator {
      * @param direction Direction
      */
     public void move(int direction) {
-        System.out.printf("Elevator %s moving to floor %d%n", getName(), (floor + direction));
+        System.out.printf("-- Elevator %s moved to floor %d%n", getName(), floor + direction);
         setFloor(getFloor() + direction);
+
+        try {
+            Thread.sleep(250);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
     }
 
     /**
@@ -97,11 +168,29 @@ public class Elevator {
                 move(direction);
             }
 
-            System.out.printf("Elevator %s stopping at floor %d%n", getName(), getFloor());
+            System.out.printf("%nElevator %s stopping at floor %d%n", getName(), getFloor());
             if (!ejectPassengers()) {
                 System.out.println("No passengers exited");
+            } else {
+                System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n",
+                        passengers.size(),
+                        getTotalWeight());
             }
+            System.out.println();
         }
+
+        System.out.printf("Elevator %s finished running%n", getName());
+    }
+
+    /**
+     * Gets the total combined weight of the persons in the elevator
+     * 
+     * @return Total weight
+     */
+    public int getTotalWeight() {
+        return passengers.stream()
+                .mapToInt(Person::getWeight)
+                .reduce(0, (a, b) -> a + b);
     }
 
     /**
@@ -123,12 +212,31 @@ public class Elevator {
     }
 
     /**
+     * Gets the elevator's max weight
+     * 
+     * @return Max weight
+     */
+    public int getMaxWeight() {
+        return maxWeight;
+    }
+
+    /**
+     * Gets the elevator's maximum amount of people
+     * 
+     * @return Maximum amount of people
+     */
+    public int getMaxPeople() {
+        return maxPeople;
+    }
+
+    /**
      * Gets the elevator's active passengers
      *
      * @return Active passengers
      */
-    public ArrayList<Person> getPassengers() {
-        return passengers;
+    @SuppressWarnings("unchecked")
+    public HashSet<Person> getPassengers() {
+        return (HashSet<Person>) passengers.clone();
     }
 
     /**
@@ -138,6 +246,24 @@ public class Elevator {
      */
     public void setFloor(int floor) {
         this.floor = floor;
+    }
+
+    /**
+     * Sets the elevator's max weight
+     * 
+     * @param weight Max weight
+     */
+    public void setMaxWeight(int weight) {
+        this.maxWeight = weight;
+    }
+
+    /**
+     * Sets the elevator's maximum amount of people
+     * 
+     * @param limit Limit
+     */
+    public void setMaxPeople(int limit) {
+        this.maxPeople = limit;
     }
 
     /**
