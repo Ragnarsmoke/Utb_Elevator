@@ -17,7 +17,7 @@ public class ElevatorSpawner {
      */
     public void spawnGroup(int maxSize) {
         int groupSize = rand.nextInt(maxSize) + 1,
-                floors = elevator.getTopFloor() - elevator.getBottomFloor() + 1,
+                floors = elevator.getFloorCount(),
                 floor,
                 targetFloor;
 
@@ -25,7 +25,7 @@ public class ElevatorSpawner {
             floor = elevator.getBottomFloor() + rand.nextInt(floors);
 
             // Bad exclusive random method, random complexity, but it works!
-            while ((targetFloor = elevator.getBottomFloor() + rand.nextInt(floors)) != floor);
+            while ((targetFloor = elevator.getBottomFloor() + rand.nextInt(floors)) == floor);
 
             // Using 0 weight for testing purposes
             eq.queue(new Person(0, floor, targetFloor));

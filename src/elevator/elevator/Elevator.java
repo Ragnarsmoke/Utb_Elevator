@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -44,7 +45,7 @@ public class Elevator implements Runnable {
     private int moveDelay;
 
     private final BlockingDeque<Integer> queue = new LinkedBlockingDeque<>();
-    private final Set<Person> passengers = new HashSet<>();
+    private final List<Person> passengers = new LinkedList<>();
 
     private final Set<ActionConsumerStruct> listeners = new HashSet<>();
 
@@ -107,7 +108,6 @@ public class Elevator implements Runnable {
             if (person.getTargetFloor() == getFloor()) {
                 callbackListeners(ElevatorAction.EJECT, person);
                 it.remove();
-                System.out.printf("Person exited at floor %d%n", getFloor());
                 exited = true;
             }
         }
@@ -171,7 +171,7 @@ public class Elevator implements Runnable {
     public boolean request(int floor) {
         boolean isSuccess = simpleRequest(floor);
 
-        System.out.printf("Elevator %s requested floor %d%n", getElevatorName(), floor);
+        
         prioritize();
 
         synchronized (consumerLock) {
@@ -200,7 +200,7 @@ public class Elevator implements Runnable {
             }
         }
 
-        System.out.printf("Elevator %s requested floors %s%n", getElevatorName(), floors.toString());
+        
         prioritize();
 
         synchronized (consumerLock) {
@@ -229,7 +229,7 @@ public class Elevator implements Runnable {
 
                 if (request) {
                     request(passenger.getTargetFloor());
-                    System.out.printf("Person requested floor %d%n", passenger.getTargetFloor());
+                    
                 }
 
                 System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n", passengers.size(),
@@ -248,7 +248,7 @@ public class Elevator implements Runnable {
      * @param direction Direction
      */
     public void move(int direction) {
-        System.out.printf("-- Elevator %s moved to floor %d%n", getElevatorName(), getFloor() + direction);
+        
         setFloor(getFloor() + direction);
 
         passengers.forEach(person -> person.setFloor(getFloor()));
@@ -275,7 +275,7 @@ public class Elevator implements Runnable {
 
             int floor, direction;
 
-            System.out.printf("Elevator %s started running from floor %d%n", getElevatorName(), getFloor());
+            
 
             while (!queue.isEmpty()) {
                 synchronized (queueLock) {
@@ -296,7 +296,7 @@ public class Elevator implements Runnable {
                     }
                 }
 
-                System.out.printf("%nElevator %s stopping at floor %d%n", getElevatorName(), getFloor());
+                
                 if (!ejectPassengers()) {
                     System.out.println("No passengers exited");
                 } else {
@@ -307,7 +307,7 @@ public class Elevator implements Runnable {
                 System.out.println();
             }
 
-            System.out.printf("Elevator %s finished running%n", getElevatorName());
+            
         }
     }
 
@@ -399,13 +399,21 @@ public class Elevator implements Runnable {
     }
 
     /**
+     * Gets the floor count
+     * 
+     * @return Floor count
+     */
+    public int getFloorCount() {
+        return getTopFloor() - getBottomFloor() + 1;
+    }
+
+    /**
      * Gets the elevator's active passengers
      *
      * @return Active passengers
      */
-    @SuppressWarnings("unchecked")
-    public final HashSet<Person> getPassengers() {
-        return (HashSet<Person>) ((HashSet<Person>) passengers).clone();
+    public final List<Person> getPassengers() {
+        return passengers;
     }
 
     /**

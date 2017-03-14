@@ -40,6 +40,13 @@ public class Application {
         window.init();
 
         canvas.useDeviceFrequency();
+
+        // Initializes the elevator renderer
+        ElevatorRenderer renderer = new ElevatorRenderer(elevator, eq);
+
+        canvas.setSurface(g -> {
+            renderer.render(g);
+        });
     }
 
     /**
@@ -47,7 +54,7 @@ public class Application {
      */
     private void initElevator() {
         // Initializes the main elevator
-        elevator = new Elevator(5, "MAIN");
+        elevator = new Elevator(1, "MAIN");
         elevator.setMoveDelay(250);
         elevator.setFloorRange(1, 10);
 
@@ -59,7 +66,7 @@ public class Application {
 
         // Initializes the elevator spawner
         ElevatorSpawner tester = new ElevatorSpawner(elevator, eq);
-        tester.startSpawning(100, 1000, 5);
+        tester.startSpawning(100, 1000, 3);
     }
 
     /**

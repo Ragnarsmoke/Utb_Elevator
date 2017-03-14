@@ -1,13 +1,13 @@
 package elevator.elevator;
 
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.Set;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class ElevatorQueuer {
 
-    private final Set<Person> persons = new HashSet<>();
+    private final List<Person> persons = new LinkedList<>();
+
     private final Elevator elevator;
 
     private final Object queueLock = new Object();
@@ -60,11 +60,12 @@ public class ElevatorQueuer {
      * @param floor Floor
      * @return Subset of people queueing up at the given floor
      */
-    public final HashSet<Person> getFloorQueue(int floor) {
+    public final List<Person> getFloorQueue(int floor) {
+
         synchronized (queueLock) {
-            return (HashSet<Person>) persons.stream()
+            return persons.stream()
                     .filter(p -> p.getFloor() == floor)
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toCollection(LinkedList::new));
         }
     }
 
