@@ -1,7 +1,9 @@
 package elevator.elevator;
 
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ElevatorQueuer {
 
@@ -16,9 +18,9 @@ public class ElevatorQueuer {
      * @param person Person
      */
     private final void processPerson(Person person) {
-        synchronized (queueLock) {
-            elevator.addPassenger(person, true);
-        }
+        elevator.addPassenger(person, true);
+
+        elevator.request(person.getTargetFloor());
     }
 
     /**
@@ -28,12 +30,14 @@ public class ElevatorQueuer {
      */
     private final void processFloor(int floor) {
         synchronized (queueLock) {
-            persons.stream()
+            LinkedList<Person> filtered = persons.stream()
                     .filter(person -> person.getFloor() == floor)
-                    .forEach(person -> {
-                        persons.remove(person);
-                        processPerson(person);
-                    });
+                    .collect(Collectors.toCollection(LinkedList::new));
+
+            filtered.forEach(person -> {
+                persons.remove(person);
+                processPerson(person);
+            });
         }
     }
 
@@ -45,6 +49,22 @@ public class ElevatorQueuer {
     public final void queue(Person person) {
         synchronized (queueLock) {
             persons.add(person);
+        }
+
+        elevator.request(person.getFloor());
+    }
+
+    /**
+     * Gets the queue of people at the given floor
+     *
+     * @param floor Floor
+     * @return Subset of people queueing up at the given floor
+     */
+    public final HashSet<Person> getFloorQueue(int floor) {
+        synchronized (queueLock) {
+            return (HashSet<Person>) persons.stream()
+                    .filter(p -> p.getFloor() == floor)
+                    .collect(Collectors.toSet());
         }
     }
 

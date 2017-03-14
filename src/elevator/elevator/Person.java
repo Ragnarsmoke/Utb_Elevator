@@ -2,19 +2,9 @@ package elevator.elevator;
 
 public class Person {
 
-    private String name;
     private int floor;
     private int targetFloor;
     private int weight;
-
-    /**
-     * Gets the person's name
-     * 
-     * @return Name
-     */
-    public String getName() {
-        return name;
-    }
 
     /**
      * Gets the person's current floor
@@ -61,7 +51,6 @@ public class Person {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((name == null) ? 0 : name.hashCode());
         result = prime * result + targetFloor;
         result = prime * result + weight;
         return result;
@@ -81,11 +70,6 @@ public class Person {
         if (getClass() != obj.getClass())
             return false;
         Person other = (Person) obj;
-        if (name == null) {
-            if (other.name != null)
-                return false;
-        } else if (!name.equals(other.name))
-            return false;
         if (targetFloor != other.targetFloor)
             return false;
         if (weight != other.weight)
@@ -98,22 +82,11 @@ public class Person {
      *
      * @param name Person name
      * @param weight Weight
-     */
-    public Person(String name, int weight) {
-        this.name = name;
-        this.weight = weight;
-    }
-
-    /**
-     * Person
-     *
-     * @param name Person name
-     * @param weight Weight
      * @param floor Current floor
      * @param targetFloor Target floor
      */
-    public Person(String name, int weight, int floor, int targetFloor) {
-        this(name, weight);
+    public Person(int weight, int floor, int targetFloor) {
+        this.weight = weight;
         this.floor = floor;
         this.targetFloor = targetFloor;
     }

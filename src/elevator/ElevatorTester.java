@@ -1,15 +1,15 @@
 package elevator;
 
-import elevator.elevator.Elevator;
+import elevator.elevator.ElevatorQueuer;
 
 public class ElevatorTester {
 
     /**
      * Runs the tester program
      *
-     * @param elevator Elevator tester
+     * @param eq Elevator queuer
      */
-    public static void runTester(Elevator elevator) {
+    public static void runTester(ElevatorQueuer eq) {
     }
 
 }

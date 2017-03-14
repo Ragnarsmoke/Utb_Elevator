@@ -10,7 +10,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class Elevator extends Thread {
+public class Elevator implements Runnable {
 
     private String elevatorName;
     private volatile int floor;
@@ -23,9 +23,11 @@ public class Elevator extends Thread {
 
     private final BlockingDeque<Integer> queue = new LinkedBlockingDeque<>();
     private final Set<Person> passengers = new HashSet<>();
+
     private final Set<Consumer<Integer>> floorListeners = new HashSet<>();
 
     private final Object queueLock = new Object();
+    private final Object consumerLock = new Object();
 
     /**
      * Callbacks the floor listeners
@@ -74,7 +76,7 @@ public class Elevator extends Thread {
 
             if (p.getTargetFloor() == getFloor()) {
                 it.remove();
-                System.out.printf("Person %s exited at floor %d%n", p.getName(), getFloor());
+                System.out.printf("Person exited at floor %d%n", getFloor());
                 exited = true;
             }
         }
@@ -99,7 +101,7 @@ public class Elevator extends Thread {
             return;
         }
 
-        int direction = queue.peek() > getLastFloor() ? 1 : -1;
+        int direction = (int) Math.signum(queue.peek() - getLastFloor());
 
         // Gets slices of the queue containing floors above and below the current floor
         // and orders them by descending and ascending order respectively
@@ -117,7 +119,7 @@ public class Elevator extends Thread {
             queue.clear();
 
             // Prioritize in the given order
-            if (direction == 1) {
+            if (direction == 1 || direction == 0) {
                 queue.addAll(above);
                 queue.addAll(below);
             } else if (direction == -1) {
@@ -140,8 +142,8 @@ public class Elevator extends Thread {
         System.out.printf("Elevator %s requested floor %d%n", getElevatorName(), floor);
         prioritize();
 
-        synchronized (this) {
-            notify();
+        synchronized (consumerLock) {
+            consumerLock.notify();
         }
 
         return isSuccess;
@@ -169,8 +171,8 @@ public class Elevator extends Thread {
         System.out.printf("Elevator %s requested floors %s%n", getElevatorName(), floors.toString());
         prioritize();
 
-        synchronized (this) {
-            notify();
+        synchronized (consumerLock) {
+            consumerLock.notify();
         }
 
         return success;
@@ -189,14 +191,13 @@ public class Elevator extends Thread {
             boolean isSuccess = passengers.add(passenger);
 
             if (isSuccess) {
-                System.out.printf("Person %s entered at floor %d, target floor: %d%n",
-                        passenger.getName(),
+                System.out.printf("Person entered at floor %d, target floor: %d%n",
                         getFloor(),
                         passenger.getTargetFloor());
 
                 if (request) {
                     request(passenger.getTargetFloor());
-                    System.out.printf("Person %s requested floor %d", passenger.getName(), passenger.getTargetFloor());
+                    System.out.printf("Person requested floor %d%n", passenger.getTargetFloor());
                 }
 
                 System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n", passengers.size(),
@@ -228,53 +229,54 @@ public class Elevator extends Thread {
     public void run() {
         this.running = true;
 
-        synchronized (this) {
-            while (running) {
-                while (queue.isEmpty()) {
+        while (running) {
+            while (queue.isEmpty()) {
+                try {
+                    synchronized (consumerLock) {
+                        consumerLock.wait();
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    return;
+                }
+            }
+
+            System.out.println("Got queue!");
+            int floor, direction;
+
+            System.out.printf("Elevator %s started running from floor %d%n", getElevatorName(), getFloor());
+
+            while (!queue.isEmpty()) {
+                synchronized (queueLock) {
+                    floor = queue.poll();
+                }
+
+                direction = (int) Math.signum(floor - getFloor());
+
+                while (getFloor() != floor) {
+                    move(direction);
+
+                    callbackFloorListeners();
+
                     try {
-                        this.wait();
+                        Thread.sleep(getMoveDelay());
                     } catch (InterruptedException e) {
                         e.printStackTrace();
-                        return;
                     }
                 }
 
-                int floor, direction;
-
-                System.out.printf("Elevator %s started running from floor %d%n", getElevatorName(), getFloor());
-
-                while (!queue.isEmpty()) {
-                    synchronized (queueLock) {
-                        floor = queue.poll();
-                    }
-
-                    direction = floor > getFloor() ? 1 : -1;
-
-                    while (getFloor() != floor) {
-                        move(direction);
-
-                        callbackFloorListeners();
-
-                        try {
-                            Thread.sleep(getMoveDelay());
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    System.out.printf("%nElevator %s stopping at floor %d%n", getElevatorName(), getFloor());
-                    if (!ejectPassengers()) {
-                        System.out.println("No passengers exited");
-                    } else {
-                        System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n",
-                                passengers.size(),
-                                getTotalWeight());
-                    }
-                    System.out.println();
+                System.out.printf("%nElevator %s stopping at floor %d%n", getElevatorName(), getFloor());
+                if (!ejectPassengers()) {
+                    System.out.println("No passengers exited");
+                } else {
+                    System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n",
+                            passengers.size(),
+                            getTotalWeight());
                 }
-
-                System.out.printf("Elevator %s finished running%n", getElevatorName());
+                System.out.println();
             }
+
+            System.out.printf("Elevator %s finished running%n", getElevatorName());
         }
     }
 
@@ -345,6 +347,24 @@ public class Elevator extends Thread {
      */
     public final int getMaxPeople() {
         return maxPeople;
+    }
+
+    /**
+     * Gets the elevator's bottom floor
+     * 
+     * @return Bottom floor
+     */
+    public int getBottomFloor() {
+        return fRangeMin;
+    }
+
+    /**
+     * Gets the elevator's top floor
+     *
+     * @return Top floor
+     */
+    public int getTopFloor() {
+        return fRangeMax;
     }
 
     /**

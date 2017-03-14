@@ -37,7 +37,7 @@ public class Canvas extends java.awt.Canvas {
      * 
      * @param surface
      */
-    private void setSurface(Renderable surface) {
+    public void setSurface(Renderable surface) {
         this.surface = surface;
     }
 
@@ -50,7 +50,9 @@ public class Canvas extends java.awt.Canvas {
         g.setColor(Color.RED);
         g.drawString("FPS: " + fps, 10, 20);
 
-        surface.render(g);
+        if (surface != null && g != null) {
+            surface.render(g);
+        }
     }
 
     /**
