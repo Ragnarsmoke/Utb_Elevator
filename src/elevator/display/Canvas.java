@@ -30,6 +30,16 @@ public class Canvas extends java.awt.Canvas {
     private DisplayMode dMode;
     private BufferStrategy bStrategy;
     private BufferedImage bImage;
+    private Renderable surface;
+
+    /**
+     * Sets the surface object
+     * 
+     * @param surface
+     */
+    private void setSurface(Renderable surface) {
+        this.surface = surface;
+    }
 
     /**
      * Rendering
@@ -39,25 +49,27 @@ public class Canvas extends java.awt.Canvas {
     private void render(Graphics2D g) {
         g.setColor(Color.RED);
         g.drawString("FPS: " + fps, 10, 20);
+
+        surface.render(g);
     }
 
     /**
      * Initalizes graphics configuration
      */
     private void initGraphicsConfig() {
-        gDevice = GraphicsEnvironment.getLocalGraphicsEnvironment()
+        this.gDevice = GraphicsEnvironment.getLocalGraphicsEnvironment()
                 .getDefaultScreenDevice();
-        gConfig = gDevice.getDefaultConfiguration();
-        dMode = gDevice.getDisplayMode();
+        this.gConfig = gDevice.getDefaultConfiguration();
+        this.dMode = gDevice.getDisplayMode();
     }
 
     /**
      * Initializes buffer
      */
     private void initBuffer() {
-        this.createBufferStrategy(2);
-        bStrategy = this.getBufferStrategy();
-        bImage = gConfig.createCompatibleImage(width, height);
+        createBufferStrategy(2);
+        this.bStrategy = getBufferStrategy();
+        this.bImage = gConfig.createCompatibleImage(width, height);
     }
 
     /**
@@ -94,7 +106,7 @@ public class Canvas extends java.awt.Canvas {
                 curTime = System.currentTimeMillis();
 
                 if (targetFrequency > 0) {
-                    wait = this.targetFrequency - (curTime - lastTime);
+                    wait = targetFrequency - (curTime - lastTime);
 
                     if (wait > 0) {
                         try {
@@ -151,19 +163,19 @@ public class Canvas extends java.awt.Canvas {
      */
     public void init() {
         // Canvas
-        this.setSize(width, height);
-        this.setFocusable(true);
-        this.setIgnoreRepaint(true);
+        setSize(width, height);
+        setFocusable(true);
+        setIgnoreRepaint(true);
 
         // Graphics
-        this.initGraphicsConfig();
-        this.initBuffer();
+        initGraphicsConfig();
+        initBuffer();
 
         this.running = true;
 
         new Thread(() -> {
             Canvas.this.initRender();
-        }, "render").start();
+        }, "Canvas").start();
     }
 
     /**
@@ -178,7 +190,8 @@ public class Canvas extends java.awt.Canvas {
 
         this.width = width;
         this.height = height;
-        this.setUpdateFrequency(ups);
+
+        setUpdateFrequency(ups);
     }
 
 }

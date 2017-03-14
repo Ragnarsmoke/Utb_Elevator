@@ -16,15 +16,15 @@ public class Window extends JFrame {
      * Initializes the window
      */
     public void init() {
-        this.pack();
-        this.setLocationRelativeTo(null);
+        pack();
+        setLocationRelativeTo(null);
     }
 
     /**
      * Closes the window
      */
     public void close() {
-        this.dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING));
+        dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING));
     }
 
     /**
@@ -36,13 +36,13 @@ public class Window extends JFrame {
     public Window(String title, boolean exitOnClose) {
         super(title);
 
-        this.setResizable(false);
+        setResizable(false);
 
         if (exitOnClose) {
-            this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         }
 
-        this.setVisible(true);
+        setVisible(true);
     }
 
 }
