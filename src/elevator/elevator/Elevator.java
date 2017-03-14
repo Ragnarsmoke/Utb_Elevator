@@ -12,11 +12,33 @@ import java.util.stream.Collectors;
 
 public class Elevator implements Runnable {
 
+    private class ActionConsumerStruct {
+
+        private ElevatorAction action;
+        private Consumer<Object> consumer;
+
+        @SuppressWarnings("unused")
+        public Consumer<Object> getConsumer() {
+            return consumer;
+        }
+
+        @SuppressWarnings("unused")
+        public ElevatorAction getAction() {
+            return action;
+        }
+
+        public ActionConsumerStruct(ElevatorAction action, Consumer<Object> consumer) {
+            this.consumer = consumer;
+            this.action = action;
+        }
+
+    }
+
     private String elevatorName;
     private volatile int floor;
     private volatile boolean running = true;
-    private int maxWeight = 600;
-    private int maxPeople = 8;
+    private int maxWeight = Integer.MAX_VALUE;
+    private int maxPeople = Integer.MAX_VALUE;
     private int fRangeMin;
     private int fRangeMax;
     private int moveDelay;
@@ -24,22 +46,29 @@ public class Elevator implements Runnable {
     private final BlockingDeque<Integer> queue = new LinkedBlockingDeque<>();
     private final Set<Person> passengers = new HashSet<>();
 
-    private final Set<Consumer<Integer>> floorListeners = new HashSet<>();
+    private final Set<ActionConsumerStruct> listeners = new HashSet<>();
 
     private final Object queueLock = new Object();
     private final Object consumerLock = new Object();
 
     /**
-     * Callbacks the floor listeners
+     * Callbacks the listeners
+     * 
+     * @param action Action
+     * @param data Data
      */
-    private void callbackFloorListeners() {
-        int i = 0;
+    private void callbackListeners(ElevatorAction action, Object data) {
+        int i = 1;
 
-        floorListeners.forEach((listener) -> {
-            new Thread(() -> {
-                listener.accept(getFloor());
-            }, String.format("Elevator%sListener%d", getElevatorName(), i)).start();
-        });
+        for (ActionConsumerStruct listener : listeners) {
+            if (listener.action == action) {
+                new Thread(() -> {
+                    listener.consumer.accept(data);
+                }, String.format("Elevator%sListener%d", getElevatorName(), i)).start();
+            }
+
+            i++;
+        }
     }
 
     /**
@@ -68,13 +97,15 @@ public class Elevator implements Runnable {
      */
     private boolean ejectPassengers() {
         Iterator<Person> it = passengers.iterator();
-        Person p;
+        Person person;
         boolean exited = false;
 
         while (it.hasNext()) {
-            p = it.next();
+            person = it.next();
 
-            if (p.getTargetFloor() == getFloor()) {
+            // Ejects the passenger and removes it from the list
+            if (person.getTargetFloor() == getFloor()) {
+                callbackListeners(ElevatorAction.EJECT, person);
                 it.remove();
                 System.out.printf("Person exited at floor %d%n", getFloor());
                 exited = true;
@@ -87,10 +118,11 @@ public class Elevator implements Runnable {
     /**
      * Adds a floor listener
      *
+     * @param action Action
      * @param listener Listener
      */
-    public void addFloorListener(Consumer<Integer> listener) {
-        floorListeners.add(listener);
+    public void addListener(ElevatorAction action, Consumer<Object> listener) {
+        listeners.add(new ActionConsumerStruct(action, listener));
     }
 
     /**
@@ -241,7 +273,6 @@ public class Elevator implements Runnable {
                 }
             }
 
-            System.out.println("Got queue!");
             int floor, direction;
 
             System.out.printf("Elevator %s started running from floor %d%n", getElevatorName(), getFloor());
@@ -256,7 +287,7 @@ public class Elevator implements Runnable {
                 while (getFloor() != floor) {
                     move(direction);
 
-                    callbackFloorListeners();
+                    callbackListeners(ElevatorAction.STOP, getFloor());
 
                     try {
                         Thread.sleep(getMoveDelay());

@@ -76,8 +76,8 @@ public class ElevatorQueuer {
     public ElevatorQueuer(Elevator elevator) {
         this.elevator = elevator;
 
-        elevator.addFloorListener((floor) -> {
-            processFloor(floor);
+        elevator.addListener(ElevatorAction.STOP, floor -> {
+            processFloor((int) floor);
         });
     }
 
