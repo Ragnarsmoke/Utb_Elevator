@@ -9,8 +9,8 @@ import elevator.elevator.ElevatorSpawner;
 
 public class Application {
 
-    private static final int WINDOW_DEFAULTWIDTH = 800;
-    private static final int WINDOW_DEFAULTHEIGHT = 600;
+    private static final int WINDOW_DEFAULTWIDTH = 700;
+    private static final int WINDOW_DEFAULTHEIGHT = 800;
     private static final int RENDER_DEFAULTUPS = 0;
 
     private Window window;
@@ -55,8 +55,8 @@ public class Application {
     private void initElevator() {
         // Initializes the main elevator
         elevator = new Elevator(1, "MAIN");
-        elevator.setMoveDelay(250);
-        elevator.setFloorRange(1, 10);
+        elevator.setMoveDelay(400);
+        elevator.setFloorRange(1, 15);
 
         eq = new ElevatorQueuer(elevator);
 
@@ -66,18 +66,18 @@ public class Application {
 
         // Initializes the elevator spawner
         ElevatorSpawner tester = new ElevatorSpawner(elevator, eq);
-        tester.startSpawning(100, 1000, 3);
+        tester.startSpawning(100, 1000, 1);
     }
 
     /**
      * Runs the program
      */
     public void run() {
-        initElevator();
-
         EventQueue.invokeLater(() -> {
             createDisplay();
         });
+
+        initElevator();
     }
 
 }

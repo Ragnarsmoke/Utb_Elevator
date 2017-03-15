@@ -12,6 +12,9 @@ import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import elevator.elevator.Elevator;
 import elevator.elevator.ElevatorAction;
@@ -41,6 +44,8 @@ public class ElevatorRenderer {
     // Font
     private Font labelFont = new Font("Arial", Font.BOLD, 16);
 
+    private ScheduledThreadPoolExecutor timerExecutor = new ScheduledThreadPoolExecutor(1024);
+
     /**
      * Draws the person at the given coordinates
      *
@@ -69,10 +74,10 @@ public class ElevatorRenderer {
      * @param x X-coordinate
      * @param y Y-coordinate
      */
-    private void drawPersons(Graphics2D g, List<Person> persons, int x, int y) {
+    private void drawPersons(Graphics2D g, List<Person> list, int x, int y) {
         int iteration = 0;
 
-        for (Person person : persons) {
+        for (Person person : list) {
             int xOff = iteration * PERSON_WIDTH + iteration * PERSON_MARGIN;
             drawPerson(g, person, x + xOff, y);
             iteration++;
@@ -119,6 +124,7 @@ public class ElevatorRenderer {
             drawFloor(g, i, x, floorY);
 
             List<Person> persons = eq.getFloorQueue(i);
+
             int personsWidth = persons.size() * PERSON_WIDTH + (persons.size() - 1) * PERSON_MARGIN;
 
             drawPersons(g, persons, x + FLOOR_WIDTH - personsWidth, floorY + (FLOOR_HEIGHT - PERSON_HEIGHT) / 2);
@@ -138,7 +144,13 @@ public class ElevatorRenderer {
         int yOff = (elevator.getFloorCount() - elevator.getFloor()) * FLOOR_HEIGHT;
 
         drawElevator(g, x, y + yOff);
-        drawPersons(g, elevator.getPassengers(), x + PERSON_MARGIN, y + yOff + (FLOOR_HEIGHT - PERSON_HEIGHT) / 2);
+
+        List<Person> list = elevator.getPassengers();
+
+        drawPersons(g,
+                list,
+                x + PERSON_MARGIN,
+                y + yOff + (FLOOR_HEIGHT - PERSON_HEIGHT) / 2);
     }
 
     /**
@@ -209,13 +221,9 @@ public class ElevatorRenderer {
         elevator.addListener(ElevatorAction.EJECT, p -> {
             final Person person = (Person) p;
             ejected.offer(person);
-
-            new Timer().schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    ejected.poll();
-                }
-            }, 1000);;
+            timerExecutor.schedule(() -> {
+                ejected.poll();
+            }, 1, TimeUnit.SECONDS);
         });
     }
 

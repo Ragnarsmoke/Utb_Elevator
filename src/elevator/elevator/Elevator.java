@@ -1,6 +1,9 @@
 package elevator.elevator;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -18,12 +21,10 @@ public class Elevator implements Runnable {
         private ElevatorAction action;
         private Consumer<Object> consumer;
 
-        @SuppressWarnings("unused")
         public Consumer<Object> getConsumer() {
             return consumer;
         }
 
-        @SuppressWarnings("unused")
         public ElevatorAction getAction() {
             return action;
         }
@@ -44,13 +45,14 @@ public class Elevator implements Runnable {
     private int fRangeMax;
     private int moveDelay;
 
-    private final BlockingDeque<Integer> queue = new LinkedBlockingDeque<>();
+    private final Deque<Integer> queue = new ArrayDeque<>();
     private final List<Person> passengers = new LinkedList<>();
 
     private final Set<ActionConsumerStruct> listeners = new HashSet<>();
 
     private final Object queueLock = new Object();
     private final Object consumerLock = new Object();
+    private final Object passengerLock = new Object();
 
     /**
      * Callbacks the listeners
@@ -62,9 +64,9 @@ public class Elevator implements Runnable {
         int i = 1;
 
         for (ActionConsumerStruct listener : listeners) {
-            if (listener.action == action) {
+            if (listener.getAction() == action) {
                 new Thread(() -> {
-                    listener.consumer.accept(data);
+                    listener.getConsumer().accept(data);
                 }, String.format("Elevator%sListener%d", getElevatorName(), i)).start();
             }
 
@@ -85,11 +87,13 @@ public class Elevator implements Runnable {
             throw new IllegalArgumentException(String.format("Outside range (%d, %d)", fRangeMin, fRangeMax));
         }
 
-        // Ensuring uniqueness
-        if (!queue.contains(floor)) {
-            return queue.offerLast(floor);
-        } else {
-            return false;
+        synchronized (queueLock) {
+            // Ensuring uniqueness
+            if (!queue.contains(floor)) {
+                return queue.offerLast(floor);
+            } else {
+                return false;
+            }
         }
     }
 
@@ -97,18 +101,21 @@ public class Elevator implements Runnable {
      * Ejects the passengers that have their stop at the current floor
      */
     private boolean ejectPassengers() {
-        Iterator<Person> it = passengers.iterator();
         Person person;
         boolean exited = false;
 
-        while (it.hasNext()) {
-            person = it.next();
+        synchronized (passengerLock) {
+            Iterator<Person> it = passengers.iterator();
 
-            // Ejects the passenger and removes it from the list
-            if (person.getTargetFloor() == getFloor()) {
-                callbackListeners(ElevatorAction.EJECT, person);
-                it.remove();
-                exited = true;
+            while (it.hasNext()) {
+                person = it.next();
+
+                // Ejects the passenger and removes it from the list
+                if (person.getTargetFloor() == getFloor()) {
+                    callbackListeners(ElevatorAction.EJECT, person);
+                    it.remove();
+                    exited = true;
+                }
             }
         }
 
@@ -137,17 +144,17 @@ public class Elevator implements Runnable {
 
         // Gets slices of the queue containing floors above and below the current floor
         // and orders them by descending and ascending order respectively
-        LinkedList<Integer> above = (LinkedList<Integer>) queue.stream()
-                .filter(floor -> floor > getLastFloor())
-                .sorted((a, b) -> a > b ? 1 : -1)
-                .collect(Collectors.toCollection(LinkedList::new)),
-
-                below = (LinkedList<Integer>) queue.stream()
-                        .filter(floor -> floor < getLastFloor())
-                        .sorted((a, b) -> a < b ? 1 : -1)
-                        .collect(Collectors.toCollection(LinkedList::new));
-
         synchronized (queueLock) {
+            LinkedList<Integer> above = (LinkedList<Integer>) queue.stream()
+                    .filter(floor -> floor > getLastFloor())
+                    .sorted((a, b) -> a > b ? 1 : -1)
+                    .collect(Collectors.toCollection(LinkedList::new)),
+
+                    below = (LinkedList<Integer>) queue.stream()
+                            .filter(floor -> floor < getLastFloor())
+                            .sorted((a, b) -> a < b ? 1 : -1)
+                            .collect(Collectors.toCollection(LinkedList::new));
+
             queue.clear();
 
             // Prioritize in the given order
@@ -171,7 +178,6 @@ public class Elevator implements Runnable {
     public boolean request(int floor) {
         boolean isSuccess = simpleRequest(floor);
 
-        
         prioritize();
 
         synchronized (consumerLock) {
@@ -188,26 +194,24 @@ public class Elevator implements Runnable {
      * @return True if any floors were added
      */
     public boolean request(Collection<? extends Integer> floors) {
-        Iterator<? extends Integer> it = floors.iterator();
-        boolean success = false;
-        int floor;
-
-        while (it.hasNext()) {
-            floor = it.next();
-
-            if (simpleRequest(floor)) {
-                success = true;
-            }
-        }
-
-        
-        prioritize();
-
         synchronized (consumerLock) {
-            consumerLock.notify();
-        }
+            Iterator<? extends Integer> it = floors.iterator();
+            boolean success = false;
+            int floor;
 
-        return success;
+            while (it.hasNext()) {
+                floor = it.next();
+
+                if (simpleRequest(floor)) {
+                    success = true;
+                }
+            }
+
+            prioritize();
+            consumerLock.notify();
+
+            return success;
+        }
     }
 
     /**
@@ -217,28 +221,20 @@ public class Elevator implements Runnable {
      * @param request Automatically request floor
      */
     public boolean addPassenger(Person passenger, boolean request) {
-        // Checks if the elevator can support this person
-        if ((getTotalWeight() + passenger.getWeight() <= getMaxWeight())
-                && (passengers.size() + 1 <= getMaxPeople())) {
-            boolean isSuccess = passengers.add(passenger);
+        synchronized (passengerLock) {
+            // Checks if the elevator can support this person
+            if ((getTotalWeight() + passenger.getWeight() <= getMaxWeight())
+                    && (passengers.size() + 1 <= getMaxPeople())) {
+                boolean isSuccess = passengers.add(passenger);
 
-            if (isSuccess) {
-                System.out.printf("Person entered at floor %d, target floor: %d%n",
-                        getFloor(),
-                        passenger.getTargetFloor());
-
-                if (request) {
+                if (isSuccess && request) {
                     request(passenger.getTargetFloor());
-                    
                 }
 
-                System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n", passengers.size(),
-                        getTotalWeight());
+                return isSuccess;
+            } else {
+                return false;
             }
-
-            return isSuccess;
-        } else {
-            return false;
         }
     }
 
@@ -248,10 +244,11 @@ public class Elevator implements Runnable {
      * @param direction Direction
      */
     public void move(int direction) {
-        
         setFloor(getFloor() + direction);
 
-        passengers.forEach(person -> person.setFloor(getFloor()));
+        synchronized (passengerLock) {
+            passengers.forEach(person -> person.setFloor(getFloor()));
+        }
     }
 
     /**
@@ -262,7 +259,7 @@ public class Elevator implements Runnable {
         this.running = true;
 
         while (running) {
-            while (queue.isEmpty()) {
+            while (queue.isEmpty() && running) {
                 try {
                     synchronized (consumerLock) {
                         consumerLock.wait();
@@ -275,9 +272,7 @@ public class Elevator implements Runnable {
 
             int floor, direction;
 
-            
-
-            while (!queue.isEmpty()) {
+            while (!queue.isEmpty() && running) {
                 synchronized (queueLock) {
                     floor = queue.poll();
                 }
@@ -296,18 +291,9 @@ public class Elevator implements Runnable {
                     }
                 }
 
-                
-                if (!ejectPassengers()) {
-                    System.out.println("No passengers exited");
-                } else {
-                    System.out.printf("Passengers inside: %d, Current weight: %dkg%n%n",
-                            passengers.size(),
-                            getTotalWeight());
-                }
-                System.out.println();
+                ejectPassengers();
             }
 
-            
         }
     }
 
@@ -413,7 +399,7 @@ public class Elevator implements Runnable {
      * @return Active passengers
      */
     public final List<Person> getPassengers() {
-        return passengers;
+        return new ArrayList<>(passengers);
     }
 
     /**

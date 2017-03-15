@@ -51,7 +51,9 @@ public class ElevatorQueuer {
             persons.add(person);
         }
 
-        elevator.request(person.getFloor());
+        if (elevator.request(person.getFloor())) {
+            //System.out.println("Notice: Person could not enter the elevator");
+        }
     }
 
     /**
@@ -61,7 +63,6 @@ public class ElevatorQueuer {
      * @return Subset of people queueing up at the given floor
      */
     public final List<Person> getFloorQueue(int floor) {
-
         synchronized (queueLock) {
             return persons.stream()
                     .filter(p -> p.getFloor() == floor)
